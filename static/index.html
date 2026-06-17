@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>台本リーダー</title>
+  <style>
+    :root {
+      --bg: #111318;
+      --surface: #1c1e26;
+      --card: #242736;
+      --accent: #5b8dee;
+      --accent2: #e05b7f;
+      --text: #e8eaf0;
+      --muted: #6b7280;
+      --border: #2e3044;
+      --player-h: 130px;
+      --safe-b: env(safe-area-inset-bottom, 0px);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+      min-height: 100dvh;
+      padding-bottom: calc(var(--player-h) + var(--safe-b) + 16px);
+    }
+
+    /* ── Header ── */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 20px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    header h1 { font-size: 17px; font-weight: 700; letter-spacing: 0.02em; }
+    header span { font-size: 20px; }
+
+    /* ── Input card ── */
+    .input-card {
+      margin: 16px 16px 0;
+      background: var(--surface);
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      padding: 14px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 110px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      padding: 10px 12px;
+      font-size: 14px;
+      line-height: 1.6;
+      resize: none;
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+    textarea:focus { outline: none; border-color: var(--accent); }
+    textarea::placeholder { color: var(--muted); }
+
+    .row { display: flex; gap: 8px; margin-top: 10px; }
+
+    select {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      padding: 0 12px;
+      font-size: 14px;
+      height: 44px;
+      cursor: pointer;
+    }
+    select:focus { outline: none; }
+
+    .btn-convert {
+      flex: 1;
+      height: 44px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn-convert:active { transform: scale(0.97); }
+    .btn-convert:disabled { opacity: 0.45; cursor: default; transform: none; }
+
+    /* progress */
+    .progress-wrap { margin-top: 10px; display: none; }
+    .progress-track {
+      height: 4px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+    .status { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    .status.error { color: var(--accent2); }
+
+    /* ── Chapter list ── */
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      text-transform: uppercase;
+      padding: 18px 20px 8px;
+    }
+
+    .chapters { display: flex; flex-direction: column; gap: 6px; padding: 0 16px; }
+
+    .chapter-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      user-select: none;
+    }
+    .chapter-card:active { background: var(--card); }
+    .chapter-card.active {
+      border-color: var(--accent);
+      background: var(--card);
+    }
+    .chapter-card.generating { opacity: 0.5; cursor: default; }
+
+    .ch-num {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.07);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      flex-shrink: 0;
+      color: var(--muted);
+      transition: background 0.15s, color 0.15s;
+    }
+    .chapter-card.active .ch-num { background: var(--accent); color: #fff; }
+
+    .ch-info { flex: 1; min-width: 0; }
+    .ch-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ch-preview { font-size: 11px; color: var(--muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .ch-play { color: var(--muted); font-size: 16px; flex-shrink: 0; transition: color 0.15s; }
+    .chapter-card.active .ch-play { color: var(--accent); }
+
+    /* empty state */
+    .empty {
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--muted);
+    }
+    .empty-icon { font-size: 44px; margin-bottom: 12px; }
+    .empty-text { font-size: 14px; line-height: 1.8; }
+
+    /* ── Bottom Player ── */
+    .player {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 12px 20px calc(12px + var(--safe-b));
+      display: none;
+      z-index: 30;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .player-title {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 10px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .player-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .p-btn {
+      background: none;
+      border: none;
+      color: var(--text);
+      cursor: pointer;
+      padding: 6px;
+      font-size: 22px;
+      line-height: 1;
+      opacity: 0.8;
+      transition: opacity 0.1s;
+    }
+    .p-btn:active { opacity: 0.5; }
+
+    .p-playpause {
+      width: 46px;
+      height: 46px;
+      background: var(--accent);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+      transition: transform 0.1s;
+    }
+    .p-playpause:active { transform: scale(0.93); }
+
+    .p-progress { flex: 1; }
+
+    .seek {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(255,255,255,0.12);
+      cursor: pointer;
+      outline: none;
+    }
+    .seek::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+    }
+
+    .time-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 5px;
+    }
+
+    .speed-btn {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 9px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.1s;
+    }
+    .speed-btn:active { background: rgba(255,255,255,0.16); }
+
+    audio { display: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <span>📖</span>
+  <h1>台本リーダー</h1>
+</header>
+
+<div class="input-card">
+  <textarea id="scriptText" placeholder="台本テキストをここに貼り付けてください。&#10;「Section 01 …」で始まる行が自動でチャプターになります。"></textarea>
+  <div class="row">
+    <select id="voiceSelect">
+      <option value="nanami">女性 (Nanami)</option>
+      <option value="keita">男性 (Keita)</option>
+    </select>
+    <button class="btn-convert" id="convertBtn" onclick="startConvert()">▶ 変換する</button>
+  </div>
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-track">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+    <div class="status" id="statusText"></div>
+  </div>
+</div>
+
+<div class="section-label" id="sectionLabel" style="display:none">チャプター</div>
+<div class="chapters" id="chapterList">
+  <div class="empty">
+    <div class="empty-icon">🎙️</div>
+    <div class="empty-text">台本を貼り付けて<br>「変換する」をタップ</div>
+  </div>
+</div>
+
+<!-- Bottom player -->
+<div class="player" id="player">
+  <div class="player-title" id="playerTitle">—</div>
+  <div class="player-row">
+    <button class="p-btn" onclick="prevChapter()" title="前へ">⏮</button>
+    <button class="p-btn p-playpause" id="playPauseBtn" onclick="togglePlay()">▶</button>
+    <button class="p-btn" onclick="nextChapter()" title="次へ">⏭</button>
+    <div class="p-progress">
+      <input type="range" class="seek" id="seekBar" value="0" min="0" max="100" step="0.1"
+             oninput="seekTo(this.value)">
+      <div class="time-row">
+        <span id="currentTime">0:00</span>
+        <span id="duration">—</span>
+      </div>
+    </div>
+    <button class="speed-btn" id="speedBtn" onclick="cycleSpeed()">1.0×</button>
+  </div>
+</div>
+
+<audio id="audioEl"></audio>
+
+<script>
+  const audio = document.getElementById('audioEl');
+  let chapters = [];
+  let currentIdx = -1;
+  const SPEEDS = [0.75, 1.0, 1.25, 1.5, 2.0];
+  let speedIdx = 1;
+
+  /* ── Convert ── */
+  async function startConvert() {
+    const text = document.getElementById('scriptText').value.trim();
+    if (!text) { alert('テキストを入力してください'); return; }
+
+    const voice = document.getElementById('voiceSelect').value;
+    const btn = document.getElementById('convertBtn');
+    const wrap = document.getElementById('progressWrap');
+    const fill = document.getElementById('progressFill');
+    const status = document.getElementById('statusText');
+    const list = document.getElementById('chapterList');
+    const label = document.getElementById('sectionLabel');
+
+    btn.disabled = true;
+    wrap.style.display = 'block';
+    fill.style.width = '0%';
+    status.className = 'status';
+    status.textContent = '台本を解析中…';
+    chapters = [];
+    currentIdx = -1;
+    list.innerHTML = '';
+    label.style.display = 'none';
+    document.getElementById('player').style.display = 'none';
+
+    try {
+      const res = await fetch('/api/convert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, voice }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'サーバーエラー' }));
+        throw new Error(err.detail || 'サーバーエラー');
+      }
+
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      let total = 0;
+      let done = 0;
+
+      label.style.display = 'block';
+
+      while (true) {
+        const { value, done: streamDone } = await reader.read();
+        if (streamDone) break;
+        buf += dec.decode(value, { stream: true });
+        const parts = buf.split('\n');
+        buf = parts.pop();
+
+        for (const part of parts) {
+          if (!part.startsWith('data: ')) continue;
+          let d;
+          try { d = JSON.parse(part.slice(6)); } catch { continue; }
+
+          if (d.type === 'start') {
+            total = d.total;
+            status.textContent = `音声生成中… 0 / ${total} チャプター`;
+          } else if (d.type === 'chapter') {
+            done++;
+            chapters.push(d);
+            renderChapter(d, done - 1);
+            fill.style.width = `${(done / total) * 100}%`;
+            status.textContent = `音声生成中… ${done} / ${total} チャプター`;
+          } else if (d.type === 'done') {
+            status.textContent = `✓ ${total} チャプター完了`;
+            setTimeout(() => { wrap.style.display = 'none'; }, 2500);
+          } else if (d.type === 'error') {
+            throw new Error(d.message);
+          }
+        }
+      }
+    } catch (e) {
+      const status = document.getElementById('statusText');
+      status.className = 'status error';
+      status.textContent = `エラー: ${e.message}`;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  /* ── Render chapter card ── */
+  function renderChapter(ch, idx) {
+    const div = document.createElement('div');
+    div.className = 'chapter-card';
+    div.id = `card-${idx}`;
+    div.onclick = () => playChapter(idx);
+    div.innerHTML = `
+      <div class="ch-num">${idx + 1}</div>
+      <div class="ch-info">
+        <div class="ch-title">${esc(shortTitle(ch.title))}</div>
+        <div class="ch-preview">${esc(ch.preview || '')}</div>
+      </div>
+      <div class="ch-play">▶</div>`;
+    document.getElementById('chapterList').appendChild(div);
+  }
+
+  function shortTitle(t) {
+    // "Section 01　持ち家 vs 賃貸" → keep as-is but cap length
+    return t.length > 28 ? t.slice(0, 28) + '…' : t;
+  }
+
+  function esc(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  /* ── Playback ── */
+  function playChapter(idx) {
+    if (idx < 0 || idx >= chapters.length) return;
+    document.querySelectorAll('.chapter-card').forEach((c, i) => {
+      c.classList.toggle('active', i === idx);
+    });
+    currentIdx = idx;
+    const ch = chapters[idx];
+    document.getElementById('playerTitle').textContent = shortTitle(ch.title);
+    audio.src = ch.audio_url;
+    audio.playbackRate = SPEEDS[speedIdx];
+    audio.play();
+    document.getElementById('player').style.display = 'block';
+    document.getElementById('playPauseBtn').textContent = '⏸';
+    // scroll card into view
+    const card = document.getElementById(`card-${idx}`);
+    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function togglePlay() {
+    if (audio.paused) { audio.play(); }
+    else { audio.pause(); }
+  }
+
+  function prevChapter() { if (currentIdx > 0) playChapter(currentIdx - 1); }
+  function nextChapter() { if (currentIdx < chapters.length - 1) playChapter(currentIdx + 1); }
+
+  function seekTo(v) {
+    if (audio.duration) audio.currentTime = (v / 100) * audio.duration;
+  }
+
+  function cycleSpeed() {
+    speedIdx = (speedIdx + 1) % SPEEDS.length;
+    audio.playbackRate = SPEEDS[speedIdx];
+    document.getElementById('speedBtn').textContent = `${SPEEDS[speedIdx]}×`;
+  }
+
+  function fmt(s) {
+    const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+    return `${m}:${String(sec).padStart(2, '0')}`;
+  }
+
+  audio.addEventListener('timeupdate', () => {
+    if (!audio.duration) return;
+    document.getElementById('seekBar').value = (audio.currentTime / audio.duration) * 100;
+    document.getElementById('currentTime').textContent = fmt(audio.currentTime);
+    document.getElementById('duration').textContent = fmt(audio.duration);
+  });
+  audio.addEventListener('play',  () => { document.getElementById('playPauseBtn').textContent = '⏸'; });
+  audio.addEventListener('pause', () => { document.getElementById('playPauseBtn').textContent = '▶'; });
+  audio.addEventListener('ended', () => {
+    document.getElementById('playPauseBtn').textContent = '▶';
+    if (currentIdx < chapters.length - 1) {
+      setTimeout(() => playChapter(currentIdx + 1), 600);
+    }
+  });
+</script>
+</body>
+</html>
