@@ -58,9 +58,11 @@ def parse_script(text: str) -> list[dict]:
             skip_next_nonempty = False
             continue
 
-        # Bare ▶ line: the NEXT non-empty line is a stage direction
-        if re.match(r"^[▶►▷]\s*$", stripped):
-            skip_next_nonempty = True
+        # ▶ line (with or without text after): always skip
+        # If bare ▶, also skip the NEXT non-empty line (direction follows)
+        if re.match(r"^[▶►▷]", stripped):
+            if re.match(r"^[▶►▷]\s*$", stripped):
+                skip_next_nonempty = True
             continue
 
         # Skip the direction line that follows ▶
