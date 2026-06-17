@@ -6,6 +6,7 @@ import uuid
 from pathlib import Path
 
 import edge_tts
+from mutagen.mp3 import MP3
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -106,12 +107,14 @@ async def convert(req: ConvertRequest):
                 audio_path = session_dir / f"chapter_{i}.mp3"
                 communicate = edge_tts.Communicate(chapter["text"], voice_id)
                 await communicate.save(str(audio_path))
+                duration_sec = MP3(str(audio_path)).info.length
                 payload = {
                     "type": "chapter",
                     "index": i,
                     "title": chapter["title"],
                     "preview": chapter["text"][:120].replace("\n", " ") + ("…" if len(chapter["text"]) > 120 else ""),
                     "audio_url": f"/api/audio/{session_id}/{i}",
+                    "duration": round(duration_sec),
                 }
                 yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
             except Exception as e:
