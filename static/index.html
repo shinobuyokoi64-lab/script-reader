@@ -240,7 +240,9 @@
       border-radius: 4px;
       margin-bottom: 2px;
       transition: background 0.2s, color 0.2s;
+      cursor: pointer;
     }
+    .script-line:active { background: rgba(255,255,255,0.08); }
     .script-line.current {
       background: var(--highlight);
       color: var(--text);
@@ -583,7 +585,7 @@ async function startConvert() {
 function renderChapter(ch, idx) {
   const lines = chapterLines[idx];
   const lineHtml = lines.map((l, li) =>
-    `<p class="script-line" id="line-${idx}-${li}">${esc(l.text)}</p>`
+    `<p class="script-line" id="line-${idx}-${li}" onclick="seekToLine(${idx},${li})">${esc(l.text)}</p>`
   ).join('');
 
   const wrap = document.createElement('div');
@@ -656,6 +658,25 @@ function startHighlighting(idx) {
 function stopHighlighting() {
   if (highlightTimer) { clearInterval(highlightTimer); highlightTimer = null; }
   document.querySelectorAll('.script-line.current').forEach(el => el.classList.remove('current'));
+}
+
+/* ═══════════════════════════════════════
+   SEEK TO LINE (tap/click a script line)
+═══════════════════════════════════════ */
+function seekToLine(chIdx, lineIdx) {
+  const frac = chapterLines[chIdx][lineIdx].startFrac;
+  if (currentIdx !== chIdx) {
+    playChapter(chIdx);
+    const doSeek = () => {
+      if (audio.duration) {
+        audio.currentTime = frac * audio.duration;
+        audio.removeEventListener('timeupdate', doSeek);
+      }
+    };
+    audio.addEventListener('timeupdate', doSeek);
+  } else {
+    if (audio.duration) audio.currentTime = frac * audio.duration;
+  }
 }
 
 /* ═══════════════════════════════════════
@@ -777,6 +798,22 @@ async function deleteSession(key) {
   await DB.del(key);
   loadSavedList();
 }
+
+/* ═══════════════════════════════════════
+   DYNAMIC BOTTOM PADDING (iPhone fix)
+═══════════════════════════════════════ */
+const playerEl = document.getElementById('player');
+const playerScreenEl = document.getElementById('playerScreen');
+
+function updatePlayerPadding() {
+  if (playerEl.classList.contains('visible')) {
+    playerScreenEl.style.paddingBottom = (playerEl.offsetHeight + 8) + 'px';
+  } else {
+    playerScreenEl.style.paddingBottom = '';
+  }
+}
+
+new ResizeObserver(updatePlayerPadding).observe(playerEl);
 
 /* ═══════════════════════════════════════
    NAVIGATION
