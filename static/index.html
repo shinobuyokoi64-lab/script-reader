@@ -350,8 +350,13 @@
     <textarea id="scriptText" placeholder="台本テキストをここに貼り付けてください。&#10;「Section 01 …」で始まる行がチャプターになります。"></textarea>
     <div class="row">
       <select id="voiceSelect">
-        <option value="nanami">女性 (Nanami)</option>
-        <option value="keita">男性 (Keita)</option>
+        <option value="nanami">女性 (Nanami) — 明るい</option>
+        <option value="aoi">女性 (Aoi) — 落ち着き</option>
+        <option value="mayu">女性 (Mayu) — 柔らか</option>
+        <option value="shiori">女性 (Shiori) — 元気</option>
+        <option value="keita">男性 (Keita) — 標準</option>
+        <option value="daichi">男性 (Daichi) — 落ち着き</option>
+        <option value="naoki">男性 (Naoki) — 自然</option>
       </select>
       <button class="btn" id="convertBtn" onclick="startConvert()">▶ 変換する</button>
     </div>
@@ -372,6 +377,7 @@
   <div class="player-top">
     <button class="back-btn" onclick="goBack()">← 戻る</button>
     <div class="session-title" id="sessionTitle">—</div>
+    <button class="save-btn" id="dlBtn" onclick="downloadMp3()">⬇ MP3</button>
     <button class="save-btn" id="saveBtn" onclick="saveSession()">💾 保存</button>
   </div>
 
@@ -834,6 +840,48 @@ async function saveSession() {
   } catch(e) {
     btn.textContent = '💾 保存';
     alert('保存に失敗しました: ' + e.message);
+  }
+}
+
+/* ═══════════════════════════════════════
+   DOWNLOAD AS MP3 FILE
+   全チャプターを1つのMP3に結合してダウンロード
+═══════════════════════════════════════ */
+async function downloadMp3() {
+  if (chapters.length === 0) return;
+  const btn = document.getElementById('dlBtn');
+  const orig = btn.textContent;
+  btn.textContent = '準備中…';
+  try {
+    // 全チャプターのBlobを確保
+    const blobs = await Promise.all(chapters.map(async ch => {
+      if (ch.audioBlob) return ch.audioBlob;
+      const src = ch.blobUrl || ch.audio_url;
+      const res = await fetch(src);
+      if (!res.ok) throw new Error('音声を取得できません');
+      const blob = await res.blob();
+      ch.audioBlob = blob;
+      ch.blobUrl = URL.createObjectURL(blob);
+      return blob;
+    }));
+
+    // MP3フレームを連結（プレイヤーは連続再生可能）
+    const merged = new Blob(blobs, { type: 'audio/mpeg' });
+    const url = URL.createObjectURL(merged);
+    const name = (document.getElementById('sessionTitle').textContent || '台本')
+      .replace(/[\\/:*?"<>|…]/g, '').trim().slice(0, 50) || '台本';
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name + '.mp3';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    btn.textContent = '✓ 保存';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  } catch (e) {
+    btn.textContent = orig;
+    alert('ダウンロードに失敗しました: ' + e.message);
   }
 }
 

@@ -19,6 +19,11 @@ TEMP_DIR.mkdir(exist_ok=True)
 VOICES = {
     "nanami": "ja-JP-NanamiNeural",
     "keita": "ja-JP-KeitaNeural",
+    "aoi": "ja-JP-AoiNeural",
+    "daichi": "ja-JP-DaichiNeural",
+    "mayu": "ja-JP-MayuNeural",
+    "naoki": "ja-JP-NaokiNeural",
+    "shiori": "ja-JP-ShioriNeural",
 }
 
 SECTION_RE = re.compile(r"^Section\s+\d+")
