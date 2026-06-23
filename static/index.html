@@ -69,7 +69,8 @@
     textarea:focus { outline: none; border-color: var(--accent); }
     textarea::placeholder { color: var(--muted); }
 
-    .row { display: flex; gap: 8px; margin-top: 10px; }
+    .row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .row select { flex: 1; min-width: 140px; }
     select {
       background: rgba(255,255,255,0.05);
       border: 1px solid var(--border);
@@ -349,15 +350,15 @@
   <div class="input-card">
     <textarea id="scriptText" placeholder="台本テキストをここに貼り付けてください。&#10;「Section 01 …」で始まる行がチャプターになります。"></textarea>
     <div class="row">
-      <select id="voiceSelect">
-        <option value="nanami">女性 (Nanami) — 明るい</option>
-        <option value="aoi">女性 (Aoi) — 落ち着き</option>
-        <option value="mayu">女性 (Mayu) — 柔らか</option>
-        <option value="shiori">女性 (Shiori) — 元気</option>
+      <select id="voiceSelect" onchange="previewVoice()">
+        <option value="nanami">女性 (Nanami) — 標準</option>
+        <option value="nanami_soft">女性 (Nanami) — 落ち着き</option>
+        <option value="nanami_bright">女性 (Nanami) — 明るい</option>
         <option value="keita">男性 (Keita) — 標準</option>
-        <option value="daichi">男性 (Daichi) — 落ち着き</option>
-        <option value="naoki">男性 (Naoki) — 自然</option>
+        <option value="keita_low">男性 (Keita) — 低め</option>
+        <option value="keita_bright">男性 (Keita) — 明るい</option>
       </select>
+      <button class="btn-outline btn" id="previewBtn" onclick="previewVoice()" style="flex:0 0 auto; width:auto; padding:0 14px;">🔊 試聴</button>
       <button class="btn" id="convertBtn" onclick="startConvert()">▶ 変換する</button>
     </div>
     <div class="prog-wrap" id="progWrap">
@@ -501,6 +502,23 @@ async function loadSavedList() {
     d.onclick = () => loadSavedSession(s);
     list.appendChild(d);
   });
+}
+
+/* ═══════════════════════════════════════
+   VOICE PREVIEW (その場で試聴)
+═══════════════════════════════════════ */
+let previewAudio = null;
+function previewVoice() {
+  const v = document.getElementById('voiceSelect').value;
+  const btn = document.getElementById('previewBtn');
+  if (previewAudio) { previewAudio.pause(); previewAudio = null; }
+  btn.textContent = '⏳ 生成中';
+  previewAudio = new Audio('/api/preview/' + v);
+  previewAudio.playbackRate = SPEEDS[speedIdx];
+  previewAudio.onplaying = () => { btn.textContent = '🔊 再生中'; };
+  previewAudio.onended = () => { btn.textContent = '🔊 試聴'; };
+  previewAudio.onerror = () => { btn.textContent = '🔊 試聴'; };
+  previewAudio.play().catch(() => { btn.textContent = '🔊 試聴'; });
 }
 
 /* ═══════════════════════════════════════
