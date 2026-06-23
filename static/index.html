@@ -254,7 +254,7 @@
       bottom: 0; left: 0; right: 0;
       background: var(--surface);
       border-top: 1px solid var(--border);
-      padding: 10px 16px calc(10px + var(--safe-b));
+      padding: 12px 16px calc(16px + var(--safe-b));
       z-index: 50;
       display: none;
     }
@@ -292,14 +292,30 @@
     .p-progress { flex: 1; }
     .seek {
       -webkit-appearance: none; appearance: none;
-      width: 100%; height: 4px;
-      border-radius: 2px;
-      background: rgba(255,255,255,0.12);
+      width: 100%; height: 22px;
+      background: transparent;
       cursor: pointer; outline: none;
+      margin: 0;
+    }
+    .seek::-webkit-slider-runnable-track {
+      height: 4px; border-radius: 2px;
+      background: rgba(255,255,255,0.12);
+    }
+    .seek::-moz-range-track {
+      height: 4px; border-radius: 2px;
+      background: rgba(255,255,255,0.12);
     }
     .seek::-webkit-slider-thumb {
       -webkit-appearance: none;
-      width: 16px; height: 16px;
+      width: 20px; height: 20px;
+      margin-top: -8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    }
+    .seek::-moz-range-thumb {
+      width: 20px; height: 20px;
+      border: none;
       border-radius: 50%;
       background: var(--accent);
     }
@@ -565,6 +581,7 @@ async function startConvert() {
           document.getElementById('totalTime').textContent = fmtDur(totalSec);
         } else if (d.type === 'done') {
           status.textContent = `✓ 完了`;
+          prefetchAudio();
           setTimeout(() => { progWrap.style.display = 'none'; }, 1500);
         } else if (d.type === 'error') {
           throw new Error(d.message);
@@ -577,6 +594,31 @@ async function startConvert() {
   } finally {
     btn.disabled = false;
   }
+}
+
+/* ═══════════════════════════════════════
+   PREFETCH AUDIO → BLOB
+   サーバー一時ファイルはRenderスリープで消えるため
+   変換直後に全音声をブラウザ内Blobへ取り込む
+═══════════════════════════════════════ */
+async function prefetchAudio() {
+  await Promise.all(chapters.map(async ch => {
+    if (ch.audioBlob || ch.blobUrl || !ch.audio_url) return;
+    try {
+      const res = await fetch(ch.audio_url);
+      if (!res.ok) return;
+      const blob = await res.blob();
+      ch.audioBlob = blob;
+      ch.blobUrl = URL.createObjectURL(blob);
+      // 再生中チャプターのソースが期限切れURLなら差し替え
+      if (currentIdx >= 0 && chapters[currentIdx] === ch && audio.src.indexOf('/api/audio/') !== -1) {
+        const t = audio.currentTime, wasPlaying = !audio.paused;
+        audio.src = ch.blobUrl;
+        audio.currentTime = t;
+        if (wasPlaying) audio.play();
+      }
+    } catch (e) {}
+  }));
 }
 
 /* ═══════════════════════════════════════
@@ -717,6 +759,28 @@ audio.addEventListener('ended', () => {
   stopHighlighting();
   document.getElementById('ppBtn').textContent = '▶';
   if (currentIdx < chapters.length - 1) setTimeout(() => playChapter(currentIdx + 1), 600);
+});
+audio.addEventListener('error', () => {
+  const ch = chapters[currentIdx];
+  if (!ch) return;
+  // Blobがあれば差し替えて再試行
+  if (ch.blobUrl && audio.src !== ch.blobUrl) {
+    audio.src = ch.blobUrl;
+    audio.play().catch(() => {});
+  } else if (ch.audio_url) {
+    // サーバー一時ファイル消失 → 取り直しを試みる
+    fetch(ch.audio_url).then(res => {
+      if (!res.ok) throw 0;
+      return res.blob();
+    }).then(blob => {
+      ch.audioBlob = blob;
+      ch.blobUrl = URL.createObjectURL(blob);
+      audio.src = ch.blobUrl;
+      audio.play().catch(() => {});
+    }).catch(() => {
+      document.getElementById('nowTitle').textContent = '⚠ 音声を再取得できません（再変換してください）';
+    });
+  }
 });
 audio.addEventListener('timeupdate', () => {
   if (!audio.duration) return;
