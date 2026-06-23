@@ -350,7 +350,7 @@
   <div class="input-card">
     <textarea id="scriptText" placeholder="台本テキストをここに貼り付けてください。&#10;「Section 01 …」で始まる行がチャプターになります。"></textarea>
     <div class="row">
-      <select id="voiceSelect" onchange="previewVoice()">
+      <select id="voiceSelect" onchange="previewVoice(true)">
         <option value="nanami">女性 (Nanami) — 標準</option>
         <option value="nanami_soft">女性 (Nanami) — 落ち着き</option>
         <option value="nanami_bright">女性 (Nanami) — 明るい</option>
@@ -508,17 +508,27 @@ async function loadSavedList() {
    VOICE PREVIEW (その場で試聴)
 ═══════════════════════════════════════ */
 let previewAudio = null;
-function previewVoice() {
-  const v = document.getElementById('voiceSelect').value;
-  const btn = document.getElementById('previewBtn');
+
+function stopPreview() {
   if (previewAudio) { previewAudio.pause(); previewAudio = null; }
+  document.getElementById('previewBtn').textContent = '🔊 試聴';
+}
+
+function previewVoice(fromSelect) {
+  const btn = document.getElementById('previewBtn');
+  // 再生中にボタンを押したら停止（トグル）。音声切替時は止めて鳴らし直す。
+  if (previewAudio) {
+    stopPreview();
+    if (!fromSelect) return;
+  }
+  const v = document.getElementById('voiceSelect').value;
   btn.textContent = '⏳ 生成中';
   previewAudio = new Audio('/api/preview/' + v);
   previewAudio.playbackRate = SPEEDS[speedIdx];
-  previewAudio.onplaying = () => { btn.textContent = '🔊 再生中'; };
-  previewAudio.onended = () => { btn.textContent = '🔊 試聴'; };
-  previewAudio.onerror = () => { btn.textContent = '🔊 試聴'; };
-  previewAudio.play().catch(() => { btn.textContent = '🔊 試聴'; });
+  previewAudio.onplaying = () => { btn.textContent = '⏹ 停止'; };
+  previewAudio.onended = () => { stopPreview(); };
+  previewAudio.onerror = () => { stopPreview(); };
+  previewAudio.play().catch(() => { stopPreview(); });
 }
 
 /* ═══════════════════════════════════════
