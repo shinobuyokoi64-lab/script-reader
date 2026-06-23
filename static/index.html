@@ -490,6 +490,7 @@ async function loadSavedList() {
         <div class="saved-name">${esc(s.label)}</div>
         <div class="saved-meta">${s.chapters.length}チャプター · ${fmtDur(s.totalSec)} · ${new Date(s.savedAt).toLocaleDateString('ja-JP')}</div>
       </div>
+      <div class="saved-del" onclick="event.stopPropagation();renameSession('${s.key}')" title="名前を変更">✏️</div>
       <div class="saved-del" onclick="event.stopPropagation();deleteSession('${s.key}')">🗑</div>`;
     d.onclick = () => loadSavedSession(s);
     list.appendChild(d);
@@ -795,6 +796,11 @@ audio.addEventListener('timeupdate', () => {
 ═══════════════════════════════════════ */
 async function saveSession() {
   if (chapters.length === 0) return;
+  const defLabel = document.getElementById('sessionTitle').textContent.replace(/…$/, '')
+    || document.getElementById('scriptText').value.trim().slice(0, 40) || 'セッション';
+  const name = prompt('保存する名前を入力してください', defLabel);
+  if (name === null) return;          // キャンセル
+  const label = name.trim() || defLabel;
   const btn = document.getElementById('saveBtn');
   btn.textContent = '保存中…';
   try {
@@ -808,7 +814,6 @@ async function saveSession() {
       return ch;
     }));
 
-    const label = document.getElementById('scriptText').value.trim().slice(0, 40) || 'セッション';
     await DB.put({
       key: sessionKey,
       label,
@@ -823,6 +828,7 @@ async function saveSession() {
       })),
     });
     isSaved = true;
+    document.getElementById('sessionTitle').textContent = label;
     btn.className = 'save-btn saved';
     btn.textContent = '✓ 保存済み';
   } catch(e) {
@@ -860,6 +866,19 @@ function loadSavedSession(s) {
 async function deleteSession(key) {
   if (!confirm('このセッションを削除しますか？')) return;
   await DB.del(key);
+  loadSavedList();
+}
+
+async function renameSession(key) {
+  const s = await DB.get(key);
+  if (!s) return;
+  const name = prompt('新しい名前を入力してください', s.label);
+  if (name === null) return;
+  const newLabel = name.trim();
+  if (!newLabel || newLabel === s.label) return;
+  s.label = newLabel;
+  await DB.put(s);
+  if (sessionKey === key) document.getElementById('sessionTitle').textContent = newLabel;
   loadSavedList();
 }
 
